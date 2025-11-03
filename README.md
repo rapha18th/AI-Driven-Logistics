@@ -22,7 +22,7 @@ Farmer Messages (CSV/Excel)
         ↓
   /plan  →  OR-Tools Solver  →  Hub Assignment + Vehicle Routing + KPIs
         ↓
-   React Frontend (Lovable.dev) → KPI Dashboard + Map Playback
+   React Frontend  → KPI Dashboard + Map Playback
 ```
 
 ---
