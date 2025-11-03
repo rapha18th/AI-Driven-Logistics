@@ -243,7 +243,7 @@ message_id,sender_phone,timestamp_local,message_text
 
 ## Deployment
 - Hosted backend: [https://rairo-agri-ai.hf.space](https://rairo-agri-ai.hf.space)
-- Frontend (Lovable.dev): displays metrics and interactive simulation  
+- Frontend React: displays metrics and interactive simulation  
 - Deployment platform: Hugging Face Spaces (port 7860)
 
 ---
