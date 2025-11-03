@@ -1,0 +1,6 @@
+google-generativeai==0.4.1
+flask
+flask-cors
+pandas
+ortools
+openpyxl
