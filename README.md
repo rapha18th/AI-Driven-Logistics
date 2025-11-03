@@ -247,7 +247,132 @@ message_id,sender_phone,timestamp_local,message_text
 - Deployment platform: Hugging Face Spaces (port 7860)
 
 ---
+## How the Demo Works (Detailed Note on Hardcoded Variables and Constraints)
 
+This demo runs on a fully self-contained, simulated environment for KwaZulu-Natal (KZN), South Africa.  
+To ensure reproducibility and quick execution, all logistics entities, market parameters, and optimisation constraints are **hardcoded directly into the system**.  
+These constants form the baseline scenario for the routing and sustainability simulation.
+
+---
+
+### System Operation (Summary)
+
+1. **Message Upload and Parsing**  
+   - The user uploads a CSV or Excel file containing farmer messages.  
+   - The backend uses Gemini-2.0-Flash to interpret each message into structured “lots” describing crop type, quantity (kg), pickup window, and location.
+
+2. **Optimisation Engine**  
+   - The structured data is then passed into an OR-Tools routing model.  
+   - Farms are automatically assigned to the nearest operational hub.  
+   - Vehicles are dispatched based on available capacity, distance, and freshness constraints.  
+   - The model applies hardcoded operational, time, and sustainability limits defined below.
+
+3. **Simulation**  
+   - The final plan is visualised on a Leaflet map with animated truck movements.  
+   - The dashboard displays KPIs such as cost, emissions, spoilage rate, and service rate, calculated from the constants and solver results.
+
+---
+
+### Demo Variables and Constraints
+
+The constants embedded in the server define the entire simulation space.  
+These parameters **cannot be changed by the user in the demo** and serve as fixed optimisation constraints.
+
+#### 1. HUBS
+The available logistics hubs, their physical locations, and handling capacities:
+- **Pretoria North (H1)** — latitude −25.71, longitude 28.20, capacity 1,500 kg, no cold storage.  
+- **Durban South (H2)** — latitude −29.95, longitude 30.93, normal capacity 1,800 kg, cold storage 2,000 kg.  
+- **Stellenbosch (H3)** — latitude −33.93, longitude 18.86, normal capacity 1,400 kg, cold storage 1,200 kg.
+
+**Constraint:** Total inbound produce per hub cannot exceed its defined `cap_kg` or `cold_cap_kg`.  
+These hubs act as dispatch centres for routing, and no new hubs are dynamically added.
+
+---
+
+#### 2. MARKETS
+The target township markets where produce is delivered.  
+Each has a fixed location, operating window, and maximum daily demand per crop:
+- **Umlazi** — open 08:00–16:00  
+- **KwaMashu** — open 08:00–17:00  
+- **Warwick/Durban CBD** — open 08:00–17:00  
+- **Pinetown** — open 09:00–17:00  
+
+**Constraint:** Deliveries to a market cannot occur outside its `open_start`–`open_end` window.  
+Each market has a capped demand (`demand[crop]`), and the solver cannot deliver more than that per crop type.
+
+---
+
+#### 3. FLEET
+A fixed set of vehicles assigned to specific hubs.  
+Each vehicle entry defines:
+- `hub_id` (which hub owns it)
+- `type` (insulated or non-insulated)
+- `cap_kg` (maximum weight per route)
+- `cost_per_km` (fuel + driver cost)
+- `co2_per_km` (carbon emissions rate)
+- `max_route_min` (maximum route duration in minutes)
+
+**Constraint:**  
+Each vehicle may only depart from its assigned hub and must not exceed:
+- `cap_kg` → total load capacity  
+- `max_route_min` → 8-hour operational time limit  
+Durban South (H2) and Pretoria North (H1) are the only hubs with active vehicles in this version.
+
+---
+
+#### 4. FRESHNESS_MIN
+Crop-specific freshness time limits (in minutes) and unit-to-kilogram conversion constants:
+- Tomatoes: base life 12 hours, extended to 36 hours under cold conditions, 1 crate = 20 kg.  
+- Leafy vegetables: base life 8 hours, extended to 24 hours under cold conditions, 1 crate = 12 kg or 1 bundle = 1.5 kg.  
+- Potatoes: base life 72 hours, extended to 96 hours under cold conditions, 1 bag = 25 kg.
+
+**Constraint:**  
+Deliveries must occur before the crop’s freshness window expires.  
+If delayed, that portion of produce is counted as “spoiled” and included in the spoilage KPI.
+
+---
+
+#### 5. PROFILES
+Policy-driven optimisation profiles determining which objective dominates the routing solver.  
+Each profile has fixed ε-constraint values:
+- **low_cost:** Emission cap 1,200 kg CO₂/day, spoilage cap 8%, service rate minimum 90%.  
+- **freshness_first:** Emission cap 2,000 kg CO₂/day, spoilage cap 2%, service rate minimum 95%.  
+- **low_carbon:** Emission cap 800 kg CO₂/day, spoilage cap 10%, service rate minimum 85%.
+
+**Constraint:**  
+The solver must respect the caps defined by the chosen profile.  
+If a solution violates a constraint (for example, spoilage exceeds S_cap_pct), it is logged as a “cap hit” and penalised in the objective function.
+
+---
+
+#### 6. KZN_PLACES
+A built-in static mapping of township names to geographic coordinates, used when farmers specify only text-based locations.  
+This mapping replaces the need for external geocoding.
+
+**Constraint:**  
+Only place names contained in `KZN_PLACES` are recognised.  
+Any farmer record referencing an unlisted area is automatically excluded from the routing model.
+
+---
+
+#### 7. PORT and SEED
+- **PORT = 7860** → required by Hugging Face Spaces runtime environment for web app hosting.  
+- **VRP_SEED = 42** → sets the solver’s random seed to ensure deterministic results across runs.
+
+**Constraint:**  
+These parameters cannot be changed during execution and maintain consistent reproducibility for evaluation and peer review.
+
+---
+
+### Summary of Purpose
+All these constants define the **spatial, temporal, and operational boundaries** of the demo.  
+They make the simulation:
+- Deterministic and reproducible.  
+- Free from dependency on live APIs.  
+- Transparent for academic auditing.  
+- Scalable for future integration with real-time data sources.
+
+In essence, the hardcoded constraints create a **controlled digital twin** of the KwaZulu-Natal agricultural logistics network — ensuring that every demonstration run yields explainable, consistent, and comparable results.
 ## Citation
 If you reference this demo or its research output, please cite:
 > Zhou-Mukamuri, et al. (2025). *Artificial Intelligence-Driven Sustainable Logistics for Informal Agricultural Markets in Southern Africa*. Quantilytix Research Lab.
